@@ -1023,6 +1023,13 @@ Otherwise, save to filename_image/ (legacy behavior)."
 (with-eval-after-load 'org
   (define-key org-mode-map (kbd "C-c e l") #'my/org-export-to-pdf-with-lualatex))
 
+(let ((dir (expand-file-name "backups/" user-emacs-directory)))
+  (make-directory dir t)
+  (setq backup-directory-alist `(("." . ,dir))
+        auto-save-file-name-transforms `((".*" ,dir t))
+        lock-file-name-transforms `((".*" ,dir t))))
+
+
 ;; --- 設定ファイルの終わり ---
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
