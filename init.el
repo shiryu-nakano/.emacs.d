@@ -15,8 +15,6 @@
 (defvar my/org-roam-books-dir nil)
 (defvar my/org-roam-papers-dir nil)
 (defvar my/org-roam-cabinet-dir nil)
-(defvar my/org-roam-weekly-dir nil)
-(defvar my/org-roam-daily-dir nil)
 (defvar my/org-roam-archive-dir nil)
 
 ;; Melpaリポジトリを追加
@@ -52,15 +50,14 @@
 (require 'ox-ipynb)
 
 ;; 参照用ディレクトリのベースを先に定義
-(setq my/org-base-directory (file-truename "~/CABiNET/org-roam/"))
-;; /Users/nkn4ryu/CABiNET/org-roam
+;; org-roam の対象はブログのリポジトリの MISC/（非公開側）
+(setq my/org-base-directory
+      (file-truename "~/ghq/github.com/shiryu-nakano/shiryu-nakano.github.io/MISC/"))
 ;; org-roam ディレクトリ構造の設定（先に定義して未ロード時の参照エラーを防ぐ）
 (setq my/org-roam-projects-dir (expand-file-name "projects/" my/org-base-directory))
 (setq my/org-roam-books-dir (expand-file-name "books/" my/org-base-directory))
 (setq my/org-roam-papers-dir (expand-file-name "papers/" my/org-base-directory))
 (setq my/org-roam-cabinet-dir (expand-file-name "cabinet/" my/org-base-directory))
-(setq my/org-roam-weekly-dir (expand-file-name "weekly/" my/org-base-directory))
-(setq my/org-roam-daily-dir (expand-file-name "daily/" my/org-base-directory))
 (setq my/org-roam-archive-dir (expand-file-name "archive/" my/org-base-directory))
 
 (use-package org-roam
@@ -93,134 +90,6 @@
 ;; -----------------------------------------------------------------------
 ;; org-roamを使ったGTDワークフローの機能を提供
 ;; =======================================================================
-
-;; -----------------------------------------------------------------------
-;; 週次ページ作成機能
-;; -----------------------------------------------------------------------
-(defun my/org-roam-weekly-create ()
-  "Create or open this week's org-roam weekly file with daily headings from Monday to Sunday."
-  (interactive)
-  (let* ((week-num (format-time-string "%Y-W%V"))
-         (filename (expand-file-name
-                    (format "%s.org" week-num)
-                    my/org-roam-weekly-dir))
-         ;; 今日の日付を取得
-         (now (current-time))
-         ;; 今週の月曜日を計算（0=日曜日, 1=月曜日, ..., 6=土曜日）
-         (day-of-week (string-to-number (format-time-string "%w" now)))
-         ;; 月曜日を0とするため調整（日曜日の場合は-6）
-         (days-since-monday (if (= day-of-week 0) 6 (- day-of-week 1)))
-         (monday (time-subtract now (days-to-time days-since-monday))))
-    (make-directory my/org-roam-weekly-dir t)
-    (find-file filename)
-    ;; バッファが空の場合のみテンプレートを挿入（二重挿入を防ぐ）
-    (when (= (buffer-size) 0)
-      (insert (format "#+title: %s\n" week-num))
-      (insert "#+date: " (format-time-string "[%Y-%m-%d %a]") "\n")
-      (insert "#+filetags: :log:weekly:\n\n")
-      (insert "* Week " (format-time-string "%V" now) "の計画\n\n")
-
-      ;; 日曜日から月曜日の順に日付の大見出しを作成
-      (dotimes (i 7)
-        (let* ((day (time-add monday (days-to-time (- 6 i))))
-               (date-str (format-time-string "%Y-%m-%d %a" day)))
-          (insert "* " date-str "\n\n")))
-      (save-buffer))
-    (when (fboundp 'org-roam-db-update-file)
-      (org-roam-db-update-file))))
-
-(global-set-key (kbd "C-c n w") #'my/org-roam-weekly-create)
-
-;; -----------------------------------------------------------------------
-;; 日次ログ（Daily Log）作成機能
-;; -----------------------------------------------------------------------
-(defun my/open-today-daily-log-impl ()
-  "Ensure today's daily log file exists.
-前日のファイルが存在すれば中身を丸ごとコピーし、タイトルの日付だけ今日に更新する。
-前日ファイルがなければデフォルトテンプレートで新規作成する。
-Returns the buffer."
-  (let* ((base-dir my/org-roam-daily-dir)
-         (rel-path (format-time-string "%Y/%m/%Y-%m-%d.org"))
-         (file     (expand-file-name rel-path base-dir))
-         (new-file (not (file-exists-p file)))
-         (yesterday (time-subtract (current-time) (days-to-time 1)))
-         (yesterday-rel-path (format-time-string "%Y/%m/%Y-%m-%d.org" yesterday))
-         (yesterday-file (expand-file-name yesterday-rel-path base-dir))
-         (today-str (format-time-string "%Y-%m-%d")))
-    ;; ディレクトリがなければ作成
-    (make-directory (file-name-directory file) t)
-    ;; ファイルを開く
-    (set-buffer (find-file-noselect file))
-    ;; 新規ファイルのみ初期化
-    (when new-file
-      (erase-buffer)
-      (if (file-exists-p yesterday-file)
-          ;; 前日ファイルを丸ごとコピーし、タイトルの日付だけ差し替え
-          (progn
-            (insert-file-contents yesterday-file)
-            (goto-char (point-min))
-            (when (re-search-forward "^#\\+title: .*$" nil t)
-              (replace-match (concat "#+title: " today-str))))
-        ;; 前日ファイルがない場合はデフォルトテンプレート
-        (insert (format "#+title: %s\n#+filetags: :daily:\n#+OPTIONS: toc:nil num:nil ^:nil tags:nil todo:nil H:10\n#+OPTIONS: broken-links:mark\n#+OPTIONS: tex:t\n#+OPTIONS: html-postamble:nil\n#+OPTIONS: links:nil\n\n* Home\n\n* TASK\n\n* LOG\n\n* inbox\n\n"
-                        today-str)))
-      (save-buffer))
-    (current-buffer)))
-
-(defun my/org-daily-log-section (section-name)
-  "Return the end-of-subtree position of SECTION-NAME in today's daily log file.
-If SECTION-NAME doesn't exist, create it at the end of the file."
-  (let* ((buf (my/open-today-daily-log-impl)))
-    (set-buffer buf)
-    (goto-char (point-min))
-    (if (re-search-forward (concat "^\\* " (regexp-quote section-name) "\\b") nil t)
-        (progn
-          (org-end-of-subtree t t)  ;; section-name のサブツリー終わりへ
-          (unless (bolp) (insert "\n"))
-          (current-buffer))
-      ;; section が見つからない場合：最後に作成
-      (goto-char (point-max))
-      (unless (bolp) (insert "\n"))
-      (insert (concat "* " section-name "\n"))
-      (current-buffer))))
-
-(defun my/org-daily-log-file ()
-  "Ensure today's daily log exists and return its file path."
-  (let ((buf (my/open-today-daily-log-impl)))
-    (buffer-file-name buf)))
-
-(defun my/org-capture-inbox-target ()
-  "Ensure today's daily log exists and return the inbox target buffer."
-  (my/open-today-daily-log-impl)
-  (my/org-daily-log-section "inbox"))
-
-(defun my/open-today-daily-log ()
-  "今日の日次ログファイルを一発で開く。
-必要ならファイルと見出しを作成する。"
-  (interactive)
-  ;; my/open-today-daily-log-impl はバッファを返すので、それを switch-to-buffer で表示
-  (let ((buf (my/open-today-daily-log-impl)))
-    (switch-to-buffer buf)
-    ;; LOGの位置に飛ぶ
-    (goto-char (point-min))
-    (when (re-search-forward "^\\* LOG\\b" nil t)
-      (forward-line 1))))
-
-(defun my/open-today-daily-inbox ()
-  "今日の日次ログファイルのinboxセクションを開く。
-必要ならファイルと見出しを作成する。"
-  (interactive)
-  ;; my/open-today-daily-log-impl はバッファを返すので、それを switch-to-buffer で表示
-  (let ((buf (my/open-today-daily-log-impl)))
-    (switch-to-buffer buf)
-    ;; inboxの位置に飛ぶ
-    (goto-char (point-min))
-    (when (re-search-forward "^\\* inbox\\b" nil t)
-      (forward-line 1))))
-
-(global-set-key (kbd "C-c n d") #'my/open-today-daily-log)
-(global-set-key (kbd "C-c n o") #'my/open-today-daily-inbox)
-
 
 ;; -----------------------------------------------------------------------
 ;; Hugo サイト用 日次ログ（Daily Log）作成機能
@@ -257,8 +126,17 @@ Returns the buffer."
               (replace-match (concat "#+TITLE: " today-str)))
             (goto-char (point-min))
             (when (re-search-forward "^#\\+URL: .*$" nil t)
-              (replace-match (format "#+URL: /posts/daily/%s/%s/%s/" year month day))))
-        (insert (format "#+TITLE: %s\n#+URL: /posts/daily/%s/%s/%s/\n#+filetags: :daily:\n#+OPTIONS: toc:nil num:nil ^:nil tags:nil todo:nil H:10\n#+OPTIONS: broken-links:mark\n#+OPTIONS: tex:t\n#+OPTIONS: html-postamble:nil\n#+OPTIONS: links:nil\n\n* Home\n\n* TASK\n\n* LOG\n\n* inbox\n\n"
+              (replace-match (format "#+URL: /posts/daily/%s/%s/%s/" year month day)))
+            ;; 前日ファイルに古い filetags が残っていれば消し、bookToC がなければ足す
+            (goto-char (point-min))
+            (when (re-search-forward "^#\\+filetags:.*\n" nil t)
+              (replace-match ""))
+            (goto-char (point-min))
+            (unless (re-search-forward "^#\\+bookToC:" nil t)
+              (goto-char (point-min))
+              (when (re-search-forward "^#\\+URL: .*\n" nil t)
+                (insert "#+bookToC: false\n"))))
+        (insert (format "#+TITLE: %s\n#+URL: /posts/daily/%s/%s/%s/\n#+bookToC: false\n#+OPTIONS: toc:nil num:nil ^:nil tags:nil todo:nil H:10\n#+OPTIONS: broken-links:mark\n#+OPTIONS: tex:t\n#+OPTIONS: html-postamble:nil\n#+OPTIONS: links:nil\n\n* Home\n\n* TASK\n\n* LOG\n\n"
                         today-str year month day)))
       (save-buffer))
     (current-buffer)))
@@ -275,60 +153,118 @@ Returns the buffer."
 (global-set-key (kbd "C-c n h") #'my/open-today-hugo-daily-log)
 
 ;; -----------------------------------------------------------------------
-;; プロジェクトタグ選択機能
+;; inbox（すべての入口）
 ;; -----------------------------------------------------------------------
-(defun my/org-pick-project-tag ()
-  "projects.org の最上位見出しからプロジェクト名を拾い、タグ文字列を返す。空入力ならタグなし。"
-  (let* ((projects-file (expand-file-name "projects.org" my/org-base-directory))
-         (cands
-          (when (file-exists-p projects-file)
-            (with-current-buffer (find-file-noselect projects-file)
-              (org-mode)
-              (org-map-entries
-               (lambda ()
-                 ;; レベル1見出しのタイトルを取り出す
-                 (nth 4 (org-heading-components)))
-               "LEVEL=1"))))
-         (cands (delete-dups (delq nil cands)))
-         (choice (completing-read
-                  "Project tag (空ならなし): "
-                  cands nil t nil nil "")))
-    (if (string= choice "")
-        ""                              ; タグなし
-      (format " :%s:" (upcase choice))))) ; 例: :arcanain2025:
+;; 置き場所を変えるときは、この my/inbox-file だけ書き換える
+(defvar my/inbox-file
+  (expand-file-name "2026/inbox.org" my/hugo-daily-dir)
+  "すべての入口になる inbox ファイル。")
+
+(defun my/send-subtree-to-inbox ()
+  "カーソル位置の見出しを、配下ごと inbox の先頭へ移す。"
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "org ファイルの中で使ってください"))
+  (org-back-to-heading t)
+  (unless (org-entry-get nil "CREATED")
+    (org-set-property "CREATED"
+                      (format-time-string "[%Y-%m-%d %a %H:%M]")))
+  (org-set-property "FROM" (file-name-nondirectory (buffer-file-name)))
+  (let ((org-reverse-note-order t))   ; 末尾ではなく先頭に積む
+    (org-refile nil nil (list nil my/inbox-file nil nil)))
+  (message "inbox へ移しました"))
+
+(global-set-key (kbd "C-c n i") (lambda () (interactive) (org-capture nil "i")))
+(global-set-key (kbd "C-c n o") (lambda () (interactive) (find-file my/inbox-file)))
+
+;; -----------------------------------------------------------------------
+;; 週のファイル（weekNN.org）と、週への割り振り
+;; -----------------------------------------------------------------------
+;; 置き場所: content/posts/daily/<年>/<その週の月曜日の月>/weekNN.org
+(defun my/week-monday (week year)
+  "ISO 週番号 WEEK（YEAR 年）の月曜日の時刻を返す。"
+  (let* ((jan4 (encode-time 0 0 12 4 1 year))   ; 1/4 は必ず第1週
+         (dow (string-to-number (format-time-string "%u" jan4)))
+         (monday1 (time-subtract jan4 (days-to-time (1- dow)))))
+    (time-add monday1 (days-to-time (* 7 (1- week))))))
+
+(defun my/week-file (&optional week year)
+  "WEEK 週（省略時は今週）のファイルのパスを返す。なければ雛形から作る。"
+  (let* ((week (or week (string-to-number (format-time-string "%V"))))
+         (year (or year (string-to-number (format-time-string "%G"))))
+         (monday (my/week-monday week year))
+         (file (expand-file-name
+                (format "%d/%s/week%02d.org" year (format-time-string "%m" monday) week)
+                my/hugo-daily-dir)))
+    (unless (file-exists-p file)
+      (make-directory (file-name-directory file) t)
+      (with-temp-file file
+        (insert (format "#+TITLE: WEEK %d\n#+URL: /posts/daily/%d/week%02d/\n#+bookToC: false\n\n* Week %d\n\n"
+                        week year week week))
+        (dotimes (i 7)
+          (let ((day (time-add monday (days-to-time i))))
+            (insert (format "- %d/%d %s |\n"
+                            (string-to-number (format-time-string "%m" day))
+                            (string-to-number (format-time-string "%d" day))
+                            (format-time-string "%a" day)))))
+        (insert "\n--------\n\n")))
+    file))
+
+(defun my/open-this-week ()
+  "今週のファイルを開く。"
+  (interactive)
+  (find-file (my/week-file)))
+
+(defun my/send-subtree-to-week (week)
+  "カーソル位置の見出しを、配下ごと WEEK 週のファイルの末尾へ移す。
+状態が INBOX なら NEXT に変える。"
+  (interactive
+   (list (read-number "割り振る週番号: "
+                      (string-to-number (format-time-string "%V")))))
+  (unless (derived-mode-p 'org-mode)
+    (user-error "org ファイルの中で使ってください"))
+  (let ((file (my/week-file week)))
+    (org-back-to-heading t)
+    (when (equal (org-get-todo-state) "INBOX")
+      (org-todo "NEXT"))
+    (org-refile nil nil (list nil file nil nil))
+    (message "week%02d へ移しました" week)))
+
+(defun my/agenda-send-to-week (week)
+  "アジェンダの画面で、カーソル行のタスクを WEEK 週のファイルへ移す。
+何も入れなければ来週。古い週の予定日は外す（移動先で付け直す）。"
+  (interactive
+   (list (read-number "移す先の週番号: "
+                      (string-to-number
+                       (format-time-string "%V" (time-add (current-time) (days-to-time 7)))))))
+  (let ((marker (or (org-get-at-bol 'org-hd-marker)
+                    (user-error "タスクの行にカーソルを置いてください"))))
+    (with-current-buffer (marker-buffer marker)
+      (save-excursion
+        (goto-char marker)
+        (when (org-get-scheduled-time nil)
+          (org-schedule '(4)))          ; 予定日を外す
+        (my/send-subtree-to-week week)))
+    (org-save-all-org-buffers)
+    (org-agenda-redo)))
+
+(with-eval-after-load 'org-agenda
+  (define-key org-agenda-mode-map (kbd "C-c C-w") #'my/agenda-send-to-week))
+
+(global-set-key (kbd "C-c n w") #'my/open-this-week)
+(with-eval-after-load 'org
+  (define-key org-mode-map (kbd "C-c C-w") #'my/send-subtree-to-week))
 
 ;; -----------------------------------------------------------------------
 ;; org-capture テンプレート設定（daily log ベース）
 ;; -----------------------------------------------------------------------
 (setq org-capture-templates
       `(
-        ;; Inbox (daily logのinboxセクションに追加)
-        ("i" "Inbox task" plain
-         (function my/org-capture-inbox-target)
-         "** INBOX %?")
-
-        ;; Daily log （日時ログ）
-        ("j" "Daily Log" plain
-         (function (lambda () (my/org-daily-log-section "LOG")))
-         "** %<%Y-%m-%d %H:%M> %(my/org-pick-project-tag)\n%?")
-
-        ;; knowledge
-        ("k" "Knowledge" entry
-         (file ,(expand-file-name "knowledge.org" my/org-base-directory))
-         "* %?\n  Created on %U")
-
-        ;; temp
-        ("t" "Temp" entry
-         (file ,(expand-file-name "temp.org" my/org-base-directory))
-         "* %?\n  Created on %U")
-
-        ;; research idea
-        ("r" "research idea" entry
-         (file ,(expand-file-name "idea.org" my/org-base-directory))
-         "* %?\n  Created on %U")))
-
-;; Inbox キャプチャ用キーバインド
-(global-set-key (kbd "C-c n i") (lambda () (interactive) (org-capture nil "i")))
+        ;; Inbox（すべての入口）
+        ("i" "Inbox" entry
+         (file my/inbox-file)
+         "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%i"
+         :empty-lines 1 :prepend t)))
 
 ;; -----------------------------------------------------------------------
 ;; プロジェクト作成機能（タグ + プロパティのハイブリッド方式）
@@ -497,35 +433,36 @@ Returns the buffer."
 ;; -----------------------------------------------------------------------
 ;; タスクアーカイブ機能
 ;; -----------------------------------------------------------------------
-(defun my/archive-task-to-tasks-org ()
-  "Move current heading to archive/tasks.org with timestamp as parent heading."
+;; 置き場所を変えるときは、この my/inbox-archive-file だけ書き換える
+(defvar my/inbox-archive-file
+  (expand-file-name "2026/inbox_archive.org" my/hugo-daily-dir)
+  "用済みの見出しを移すアーカイブファイル。")
+
+(defun my/archive-subtree ()
+  "カーソル位置の見出しを、配下ごとアーカイブの先頭へ移す。
+TODO などの状態は変えない。移した日時を ARCHIVED に記録する。"
   (interactive)
-  (let* ((archive-file (expand-file-name "archive/tasks.org" my/org-base-directory))
-         (timestamp (format-time-string "%Y-%m-%d %H:%M")))
-    ;; archive/tasks.org がなければ作成
-    (unless (file-exists-p archive-file)
-      (make-directory (file-name-directory archive-file) t)
-      (with-temp-file archive-file
-        (insert "#+title: Archived Tasks\n#+filetags: :archive:\n\n")))
-    ;; サブツリーをカット
-    (org-cut-subtree)
-    ;; archive/tasks.org に追加
-    (with-current-buffer (find-file-noselect archive-file)
-      (goto-char (point-max))
-      (unless (bolp) (insert "\n"))
-      ;; 日時を1番目の見出しとして挿入
-      (insert "* " timestamp "\n")
-      ;; タスクを2番目の見出しとして貼り付け
-      (org-paste-subtree 2)
-      ;; 貼り付けた見出しをDONEに変更
-      (org-todo "DONE")
-      (save-buffer))
-    (message "Archived to %s" archive-file)))
+  (unless (derived-mode-p 'org-mode)
+    (user-error "org ファイルの中で使ってください"))
+  (unless (file-exists-p my/inbox-archive-file)
+    (make-directory (file-name-directory my/inbox-archive-file) t)
+    (with-temp-file my/inbox-archive-file
+      (insert "#+TITLE: INBOX archive\n"
+              "#+URL: /posts/daily/2026/inbox_archive/\n"
+              "#+bookToC: false\n\n")))
+  (org-back-to-heading t)
+  (org-set-property "ARCHIVED" (format-time-string "[%Y-%m-%d %a %H:%M]"))
+  (unless (org-entry-get nil "FROM")
+    (org-set-property "FROM" (file-name-nondirectory (buffer-file-name))))
+  (let ((org-reverse-note-order t))   ; 先頭に積む
+    (org-refile nil nil (list nil my/inbox-archive-file nil nil)))
+  (message "アーカイブへ移しました"))
 
 ;; C-c r をプレフィックスキーとして設定
 (define-prefix-command 'my/refile-map)
 (global-set-key (kbd "C-c r") 'my/refile-map)
-(define-key my/refile-map (kbd "a") #'my/archive-task-to-tasks-org)
+(define-key my/refile-map (kbd "a") #'my/archive-subtree)
+(define-key my/refile-map (kbd "i") #'my/send-subtree-to-inbox)
 
 
 ;; =======================================================================
@@ -551,7 +488,7 @@ Returns the buffer."
                   (find-file (expand-file-name "projects.org" my/org-base-directory))))
 
 ;; デバッグ用
-(setq debug-on-error t)
+;; (setq debug-on-error t)
 
 ;; doom-themes の設定（use-package版）
 (use-package doom-themes
@@ -560,12 +497,6 @@ Returns the buffer."
   (load-theme 'doom-dark+ t)
   (set-frame-parameter nil 'alpha 80)
   (add-to-list 'default-frame-alist '(alpha . 80)))
-
-;; macOSのタイトルバーを完全に非表示 → ウィンドウの大きさと形状がいじれなくなったので流石に中止
-;;(when (eq system-type 'darwin)
-;;  (set-frame-parameter nil 'undecorated t)
-;;  (add-to-list 'default-frame-alist '(undecorated . t)))
-
 
 ;; macOS: タイトルバーを透明化（ボタンは残るがリサイズ可能）
 (when (eq system-type 'darwin)
@@ -657,25 +588,6 @@ Returns the buffer."
   (setq neo-window-width 30)        ; ウィンドウ幅
   (setq neo-theme 'ascii))          ; アイコンテーマ（'icons, 'arrow, 'ascii）
 
-(use-package org-super-agenda
-  :ensure t
-  :after org-roam
-  :config
-  (org-super-agenda-mode)
-  (defun my/org-super-agenda-project-top-level (item)
-    "Return top-level heading for ITEM only in org-roam project files."
-    (let ((marker (org-super-agenda--get-marker item)))
-      (when marker
-        (org-super-agenda--when-with-marker-buffer marker
-          (let ((file (buffer-file-name)))
-            (when (and file
-                       (string-prefix-p (file-truename my/org-roam-projects-dir)
-                                       (file-truename file)))
-              (org-back-to-heading t)
-              (org-get-heading t t t t)))))))
-  (setq org-super-agenda-groups
-        '((:auto-map my/org-super-agenda-project-top-level)
-          (:auto-parent t))))
 
 
 
@@ -686,7 +598,7 @@ Returns the buffer."
 (require 'org)
 ;; グローバルキーバインドの設定
 ;;(global-set-key (kbd "C-c l") 'org-store-link)
-(global-set-key (kbd "C-c a") #'my/org-agenda)
+(global-set-key (kbd "C-c a") #'org-agenda)
 (global-set-key (kbd "C-c c") 'org-capture)
 
 
@@ -764,23 +676,19 @@ Otherwise, save to filename_image/ (legacy behavior)."
 
 (global-set-key (kbd "C-c p") 'claude-code-ide-paste-clipboard-image)
 
-(defun my/org-agenda-files-roam ()
-  "Return selected org-roam files for agenda."
-  (let ((project-files (when (file-directory-p my/org-roam-projects-dir)
-                         (directory-files my/org-roam-projects-dir t "^project_.*\\.org$")))
-        (daily-file (my/org-daily-log-file))
-        (weekly-files (when (file-directory-p my/org-roam-weekly-dir)
-                        (directory-files my/org-roam-weekly-dir t "^[0-9].*\\.org$"))))
-    (append
-     project-files
-     (when (and daily-file (file-exists-p daily-file)) (list daily-file))
-     weekly-files)))
+;; アジェンダが読むファイル（ひとまず inbox のみ。体制が決まったら足す）
+(setq org-agenda-files (list my/inbox-file))
 
-(defun my/org-agenda ()
-  "Open agenda using org-roam files."
-  (interactive)
-  (let ((org-agenda-files (my/org-agenda-files-roam)))
-    (call-interactively #'org-agenda)))
+;; 予定日を過ぎた未完了タスクを、今日の欄に繰り返し出さない（予定日の欄にだけ出す）
+(setq org-scheduled-past-days 0)
+
+;; アジェンダで今日の日付を目立たせる（色を変えるときは :foreground と :background を書き換える）
+(with-eval-after-load 'org-agenda
+  (set-face-attribute 'org-agenda-date-today nil
+                      :foreground "black"
+                      :background "gold"
+                      :weight 'bold
+                      :slant 'normal))
 
 ;;(setq org-default-notes-file (concat org-directory "/home.org"))
 
@@ -814,50 +722,49 @@ Otherwise, save to filename_image/ (legacy behavior)."
         ("CANCEL" . "grey")))
 
 
-(setq org-agenda-custom-commands
-       '(("n" "Next Actions"
-         ((todo "NEXT|WIP")))
-        ("w" "Waiting"
-         ((todo "WAIT|WIP")))
-        ("h" "On Hold"
-         ((todo "HOLD|WIP")))))
 
 
 
+;; コマンドごとに読むファイルを変える。
+;;   今週のファイル = (my/week-file)   未整理 = my/inbox-file
 (setq org-agenda-custom-commands
       '(
-        ;; ---- 既存 ----
-        ("n" "Next Actions" ((todo "NEXT")))
-        ("w" "Waiting"      ((todo "WAIT")))
-        ("h" "On Hold"      ((todo "HOLD")))
-        ("T" "All Tasks"    ((todo "")))
+        ;; 今週の予定表（今週のファイルだけ）
+        ("a" "今週の予定" 
+         ((agenda "")
+          (todo "INBOX|NEXT|WIP|WAIT|HOLD|DONE|CANCEL"   ; 完了したものも残す
+                ((org-agenda-overriding-header "日付を決めていないタスク")
+                 (org-agenda-sorting-strategy '(todo-state-up))
+                 (org-agenda-skip-function
+                  '(org-agenda-skip-entry-if 'scheduled 'deadline)))))
+         ((org-agenda-files (list (my/week-file)))))
 
-        ;; ---- ★ 新規：週次レビュー ★ ----
+        ;; 未整理の一覧（inbox だけ）
+        ("i" "Inbox（未整理）" todo "INBOX"
+         ((org-agenda-files (list my/inbox-file))))
+
+        ;; 今週のファイルを状態ごとに見る
+        ("w" "Waiting" todo "WAIT"
+         ((org-agenda-files (list (my/week-file)))))
+        ("h" "On Hold" todo "HOLD"
+         ((org-agenda-files (list (my/week-file)))))
+
+        ;; 未完了すべて（inbox ＋ 今週のファイル）
+        ("T" "All Tasks" todo ""
+         ((org-agenda-files (list my/inbox-file (my/week-file)))))
+
+        ;; 週次レビュー（今週のファイルだけ）
         ("R" "Weekly Review"
-         (
-          ;; 1. 今週完了したタスク
-          (tags-todo "+DONE"
-                     ((org-agenda-overriding-header "① 今週の DONE（完了タスク）")))
-
-          ;; 2. Next Action が存在するプロジェクト
-          (todo "NEXT"
-                ((org-agenda-overriding-header "② 次に進めるタスク（Next Actions）")
+         ((todo "DONE"
+                ((org-agenda-overriding-header "① 今週の DONE（完了タスク）")))
+          (todo "NEXT|WIP"
+                ((org-agenda-overriding-header "② 終わらなかったタスク（NEXT / WIP）")
                  (org-agenda-sorting-strategy '(priority-down))))
-
-          ;; 3. 依頼中（WAIT）の棚卸し
           (todo "WAIT"
                 ((org-agenda-overriding-header "③ 他人待ち（Waiting）")))
-
-          ;; 4. 保留（HOLD）の見直し
           (todo "HOLD"
-                ((org-agenda-overriding-header "④ 保留中（Hold）")))
-
-          ;; 5. Someday の見直し
-          (tags-todo "HOLD"
-                     ((org-agenda-files (list (expand-file-name "someday.org" my/org-base-directory)))
-                      (org-agenda-overriding-header "⑤ Someday / Maybe の棚卸し")))
-          )
-         )
+                ((org-agenda-overriding-header "④ 保留中（Hold）"))))
+         ((org-agenda-files (list (my/week-file)))))
         ))
 
 
