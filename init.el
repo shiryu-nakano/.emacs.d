@@ -51,6 +51,7 @@
 (require 'init-evil)    ; Evil
 (require 'init-tools)   ; neotree、magit
 (require 'init-org)     ; Org Mode、エクスポート
+(require 'init-gtd)     ; GTD（段階1）
 (require 'init-python)  ; Python 開発環境
 (require 'init-claude)  ; vterm、Claude Code
 
