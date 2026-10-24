@@ -8,17 +8,21 @@
 (global-set-key (kbd "C-c c") #'org-capture)
 
 ;; =======================================================================
-;; クリップボードの画像を貼り付ける
+;; ① クリップボードの画像を貼り付ける
 ;; -----------------------------------------------------------------------
 ;; macOS の pngpaste コマンドが必要（brew install pngpaste）。
-;; Hugo サイトの中（hugo.toml がある場所）では static/images/ に保存し、
-;; それ以外ではファイル名_image/ に保存する。
+;; 保存先は、貼り付けるファイルの場所によって次のように変わる。
+;;   Hugo サイトの中（hugo.toml がある場所）   → static/images/ の下
+;;   GTD のフォルダ（my/org-directory）の中     → my/org-directory/images/
+;;   それ以外                                   → ファイル名_image/
+;; my/org-directory は init-gtd.el で定義している。
 ;; =======================================================================
 
 (defun org-insert-clipboard-image ()
   "Generate png file from a clipboard image and insert a link to current buffer.
 If inside a Hugo site (hugo.toml exists), save to static/images/ with relative path.
-Otherwise, save to filename_image/ (legacy behavior)."
+If inside `my/org-directory', save to its images/ directory.
+Otherwise, save to filename_image/."
   (interactive)
   (let* ((hugo-root (locate-dominating-file default-directory "hugo.toml")))
     (if hugo-root
@@ -38,25 +42,32 @@ Otherwise, save to filename_image/ (legacy behavior)."
           (make-directory image-dir t)
           (shell-command (concat "pngpaste " image-file))
           (when (file-exists-p image-file)
-            (insert (format "#+ATTR_ORG: :width %d\n" 40))
+            (insert (format "#+ATTR_ORG: :width %d\n" 400))
             (insert (concat "[[file:" org-link "]]")))
           (org-display-inline-images))
-      ;; Hugo サイトの外 → ファイル名_image/ に保存する
-      (let* ((filename
-              (concat (file-name-nondirectory (buffer-file-name))
-                      "_image/"
-                      (format-time-string "%Y%m%d_%H%M%S")
-                      ".png")))
-        (unless (file-exists-p (file-name-directory filename))
-          (make-directory (file-name-directory filename)))
-        (shell-command (concat "pngpaste " filename))
-        (when (file-exists-p filename)
-          (insert (format "#+ATTR_ORG: :width %d\n" 40))
-          (insert (concat "[[file:" filename "]]")))
+      ;; Hugo サイトの外
+      ;;   GTD のフォルダの中 → my/org-directory/images/ に保存する
+      ;;   それ以外           → ファイル名_image/ に保存する
+      (let* ((org-dir (bound-and-true-p my/org-directory))
+             (current-dir (file-name-directory (buffer-file-name)))
+             (image-dir (if (and org-dir (file-in-directory-p current-dir org-dir))
+                            (expand-file-name "images/" org-dir)
+                          (expand-file-name
+                           (concat (file-name-nondirectory (buffer-file-name)) "_image/")
+                           current-dir)))
+             (image-file (expand-file-name
+                          (format-time-string "%Y%m%d_%H%M%S.png") image-dir))
+             ;; org ファイルから画像への相対パス（projects/ の中なら ../images/...）
+             (org-link (file-relative-name image-file current-dir)))
+        (make-directory image-dir t)
+        (shell-command (concat "pngpaste " (shell-quote-argument image-file)))
+        (when (file-exists-p image-file)
+          (insert (format "#+ATTR_ORG: :width %d\n" 400))
+          (insert (concat "[[file:" org-link "]]")))
         (org-display-inline-images)))))
 
 ;; =======================================================================
-;; LuaLaTeX で PDF を出力する
+;; ② LuaLaTeX で PDF を出力する
 ;; -----------------------------------------------------------------------
 ;; LuaLaTeX と latexmk が必要（MacTeX などに含まれる）。
 ;; LaTeX プレビューの設定には影響しない。
@@ -87,8 +98,10 @@ Otherwise, save to filename_image/ (legacy behavior)."
                      org-latex-default-packages-alist)))
     (org-latex-export-to-pdf)))
 
+
+
 ;; =======================================================================
-;; Org Mode 本体
+;; ③ Org Mode 本体
 ;; =======================================================================
 
 (use-package org
