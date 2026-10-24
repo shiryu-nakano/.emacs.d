@@ -4,11 +4,12 @@
 ;;   C-c c t : 思いついた用件を、その年の inbox（inbox2026.org など）に入れる
 ;;   C-c C-s : （見出しの上で）予定日を付ける
 ;;   C-c a d : 今日のタスクを表示する
+;;   C-c i   : その年の inbox を開く
 ;;   C-c C-t : 状態を TODO と DONE で切り替える
 ;; C-c a と C-c c のキー割り当ては init-org.el にある。
 
 ;; GTD のファイルを置くフォルダ
-(defvar my/org-directory (expand-file-name "~/org/")
+(defvar my/org-directory (expand-file-name "~/ghq/github.com/shiryu-nakano/Documents/org/")
   "GTD のファイルを置くフォルダ。")
 
 (defun my/inbox-file ()
@@ -18,10 +19,14 @@
 ;; フォルダがなければ作る（キャプチャで保存できるようにするため）
 (make-directory my/org-directory t)
 
+;; その年の inbox を開く（毎晩、翌日の分に予定日を付けるときに使う）
+(global-set-key (kbd "C-c i")
+                (lambda () (interactive) (find-file (my/inbox-file))))
+
 (with-eval-after-load 'org
   (setq org-directory my/org-directory)
 
-  ;; アジェンダは ~/org/ にあるすべての .org ファイルを読む
+  ;; アジェンダは my/org-directory にあるすべての .org ファイルを読む
   ;; 前の年の inbox に残ったタスクも表示される
   (setq org-agenda-files (list my/org-directory))
 
