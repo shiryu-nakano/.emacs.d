@@ -1,12 +1,13 @@
 ;;; init-gtd.el --- GTD（段階1：収集と実行）  -*- lexical-binding: t; -*-
 
 ;; 段階1で使う操作
-;;   C-c c t : 思いついた用件を、その年の inbox（inbox2026.org など）に入れる
+;;   C-c c   : 思いついた用件を、その年の inbox（inbox2026.org など）に入れる
 ;;   C-c C-s : （見出しの上で）予定日を付ける
 ;;   C-c a d : 今日のタスクを表示する
 ;;   C-c i   : その年の inbox を開く
-;;   C-c C-t : 状態を TODO と DONE で切り替える
-;; C-c a と C-c c のキー割り当ては init-org.el にある。
+;;   C-c C-t : 状態を INBOX → TODO → DONE の順に切り替える
+;; C-c a のキー割り当ては init-org.el にある。
+;; C-c c は init-org.el で org-capture に割り当てているが、ここで上書きする。
 
 ;; GTD のファイルを置くフォルダ
 (defvar my/org-directory (expand-file-name "~/ghq/github.com/shiryu-nakano/Documents/org/")
@@ -19,6 +20,14 @@
 ;; フォルダがなければ作る（キャプチャで保存できるようにするため）
 (make-directory my/org-directory t)
 
+;; テンプレートを選ばずに、その年の inbox へキャプチャする
+(defun my/capture-inbox ()
+  "テンプレートを選ばずに、その年の inbox へキャプチャする。"
+  (interactive)
+  (org-capture nil "i"))
+
+(global-set-key (kbd "C-c c") #'my/capture-inbox)
+
 ;; その年の inbox を開く（毎晩、翌日の分に予定日を付けるときに使う）
 (global-set-key (kbd "C-c i")
                 (lambda () (interactive) (find-file (my/inbox-file))))
@@ -30,17 +39,21 @@
   ;; 前の年の inbox に残ったタスクも表示される
   (setq org-agenda-files (list my/org-directory))
 
-  ;; 状態は TODO と DONE の二つだけ（段階3で WAIT と SOMEDAY を加える）
+  ;; 状態
+  ;;   INBOX : 入れたばかりで、まだ何をするか決めていない
+  ;;   TODO  : やると決めた行動
+  ;;   DONE  : 完了
+  ;; WAIT と SOMEDAY は後の段階で加える
   (setq org-todo-keywords
-        '((sequence "TODO(t)" "|" "DONE(d)")))
+        '((sequence "INBOX(i)" "TODO(t)" "|" "DONE(d)")))
 
   ;; DONE にした日時を記録する（段階2の週次レビューで使う）
   (setq org-log-done 'time)
 
   ;; キャプチャのテンプレート（入れる先はその時点の年の inbox）
   (setq org-capture-templates
-        '(("t" "Task" entry (file my/inbox-file)
-           "* TODO %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
+        '(("i" "Inbox" entry (file my/inbox-file)
+           "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
            :empty-lines 1)))
 
   ;; アジェンダの表示
