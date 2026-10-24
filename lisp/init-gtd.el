@@ -48,6 +48,14 @@
   (setq org-todo-keywords
         '((sequence "INBOX(i)" "TODO(t)" "|" "DONE(d)" "SOMEDAY(s)")))
 
+  ;; 状態ごとの色
+  ;; 色を変えるときは :foreground の色名を書き換える（M-x list-colors-display で一覧を見られる）
+  (setq org-todo-keyword-faces
+        '(("INBOX"   . (:foreground "orange"         :weight bold))
+          ("TODO"    . (:foreground "deep sky blue"  :weight bold))
+          ("DONE"    . (:foreground "forest green"   :weight bold))
+          ("SOMEDAY" . (:foreground "gray60"         :weight bold))))
+
   ;; DONE にした日時を記録する（段階2の週次レビューで使う）
   (setq org-log-done 'time)
 
