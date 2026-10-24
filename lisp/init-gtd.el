@@ -49,8 +49,8 @@
     (interactive)
     (org-capture nil "t"))
   :config
-  ;; 見出しの先頭の * を、最後の一つ以外は目立たなくする
-  (setq org-hide-leading-stars t)
+  ;; 見出しの先頭の * をすべて表示する（記事では t にして、最後の一つ以外を目立たなくしている）
+  (setq org-hide-leading-stars nil)
   ;; ファイルを開いたときに見出しを折りたたまない
   (setq org-startup-folded nil)
 
