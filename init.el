@@ -704,7 +704,6 @@ Otherwise, save to filename_image/ (legacy behavior)."
       '((sequence
          "INBOX(i)"   ; 未整理
          "NEXT(n)"    ; 次にとるべき行動
-         "WIP(c)"     ; 作業中
          "WAIT(w)"    ; 待ち状態
          "|"
          "DONE(d)"    ; 完了
