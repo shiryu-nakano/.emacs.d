@@ -3,9 +3,7 @@
 ;; 日付を英語で表記する（December など）
 (setq system-time-locale "C")
 
-;; Org 標準のアジェンダとキャプチャを呼び出すキー
-(global-set-key (kbd "C-c a") #'org-agenda)
-(global-set-key (kbd "C-c c") #'org-capture)
+;; アジェンダとキャプチャのキー（C-c a、C-c c）は init-gtd.el にある
 
 ;; =======================================================================
 ;; ① クリップボードの画像を貼り付ける
@@ -13,15 +11,15 @@
 ;; macOS の pngpaste コマンドが必要（brew install pngpaste）。
 ;; 保存先は、貼り付けるファイルの場所によって次のように変わる。
 ;;   Hugo サイトの中（hugo.toml がある場所）   → static/images/ の下
-;;   GTD のフォルダ（my/org-directory）の中     → my/org-directory/images/
+;;   GTD のフォルダ（org-directory）の中        → org-directory/images/
 ;;   それ以外                                   → ファイル名_image/
-;; my/org-directory は init-gtd.el で定義している。
+;; org-directory は init-gtd.el で設定している。
 ;; =======================================================================
 
 (defun org-insert-clipboard-image ()
   "Generate png file from a clipboard image and insert a link to current buffer.
 If inside a Hugo site (hugo.toml exists), save to static/images/ with relative path.
-If inside `my/org-directory', save to its images/ directory.
+If inside `org-directory', save to its images/ directory.
 Otherwise, save to filename_image/."
   (interactive)
   (let* ((hugo-root (locate-dominating-file default-directory "hugo.toml")))
@@ -46,9 +44,9 @@ Otherwise, save to filename_image/."
             (insert (concat "[[file:" org-link "]]")))
           (org-display-inline-images))
       ;; Hugo サイトの外
-      ;;   GTD のフォルダの中 → my/org-directory/images/ に保存する
+      ;;   GTD のフォルダの中 → org-directory/images/ に保存する
       ;;   それ以外           → ファイル名_image/ に保存する
-      (let* ((org-dir (bound-and-true-p my/org-directory))
+      (let* ((org-dir (bound-and-true-p org-directory))
              (current-dir (file-name-directory (buffer-file-name)))
              (image-dir (if (and org-dir (file-in-directory-p current-dir org-dir))
                             (expand-file-name "images/" org-dir)
