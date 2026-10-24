@@ -11,11 +11,13 @@
 ;;   - C-m（org-return-indent）は割り当てない。最近の Org では Enter で自動的に字下げされるため
 ;;   - C-c h（helm-org-in-buffer-headings）は割り当てない。helm を入れていないため
 ;;   - defadvice は古い書き方のため、advice-add で書き直した
+;;   - キャプチャはテンプレートを選ばず、C-c c だけで inbox に入れる。作成日時は記録しない
+;;   - SOMEDAY の見出しを someday.org にまとめて移すコマンドを加えた
 ;;
 ;; 主な操作
-;;   C-c c t : タスクを inbox に入れる
-;;   C-c c i : アイデアを idea に入れる
+;;   C-c c   : inbox に入れる（INBOX の状態で入る）
 ;;   C-c i   : inbox のファイルを開く
+;;   M-x my:org-move-someday : 開いているファイルの SOMEDAY を someday.org に移す
 ;;   C-c a d : 今日のタスク
 ;;   C-c a x : 予定日も締め切りもないタスクの一覧
 ;;   C-c g   : 時間を計測中のタスクへ移動する
@@ -42,6 +44,10 @@
   (defun my:org-goto-inbox ()
     (interactive)
     (find-file org-default-notes-file))
+  ;; テンプレートを選ばずに inbox へ入れる
+  (defun my:org-capture-inbox ()
+    (interactive)
+    (org-capture nil "t"))
   :config
   ;; 見出しの先頭の * を、最後の一つ以外は目立たなくする
   (setq org-hide-leading-stars t)
@@ -72,14 +78,10 @@
   ;; タグ（C-c C-q で付ける。括弧の中の文字で選べる）
   (setq org-tag-alist '(("PROJECT" . ?p) ("MEMO" . ?m) ("PETIT" . ?t)))
 
-  ;; キャプチャのテンプレート
-  ;;   t : inbox ファイルの「inbox」見出しの下にタスクを入れる
-  ;;   i : inbox ファイルの「idea」見出しの下にアイデアを入れる
+  ;; キャプチャのテンプレート（inbox ファイルの「inbox」見出しの下に INBOX として入れる）
   (setq org-capture-templates
         '(("t" "Task" entry (file+headline org-default-notes-file "inbox")
-           "** INBOX %?\n   CREATED: %U\n")
-          ("i" "Idea" entry (file+headline org-default-notes-file "idea")
-           "** %?\n   CREATED: %U\n")))
+           "** INBOX %?\n")))
 
   ;; 見出しを移す先は、アジェンダが読むファイルの最上位の見出し
   (setq org-refile-targets '((org-agenda-files :maxlevel . 1)))
@@ -90,12 +92,49 @@
 
   :bind
   (("C-c a" . org-agenda)
-   ("C-c c" . org-capture)
+   ("C-c c" . my:org-capture-inbox)
    ("C-c g" . org-clock-goto)
    ("C-c i" . my:org-goto-inbox)
    :map org-mode-map
    ("M-n" . org-forward-heading-same-level)
    ("M-p" . org-backward-heading-same-level)))
+
+;; =======================================================================
+;; SOMEDAY の見出しを someday.org にまとめて移す
+;; -----------------------------------------------------------------------
+;; 移す先は org-directory/someday.org の「someday」見出しの下。
+;; ファイルや見出しがなければ作る。
+;; =======================================================================
+
+(defun my:org-someday-location ()
+  "someday.org の「someday」見出しを、org-refile に渡す形で返す。"
+  (let ((file (expand-file-name "someday.org" org-directory)))
+    (with-current-buffer (find-file-noselect file)
+      (org-with-wide-buffer
+       (let ((pos (org-find-exact-headline-in-buffer "someday")))
+         (unless pos
+           (goto-char (point-max))
+           (unless (bolp) (insert "\n"))
+           (insert "* someday\n")
+           (save-buffer)
+           (setq pos (org-find-exact-headline-in-buffer "someday")))
+         (list "someday" file nil (marker-position pos)))))))
+
+(defun my:org-move-someday ()
+  "開いているファイルの SOMEDAY の見出しを、someday.org にまとめて移す。"
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Org のファイルの中で実行してください"))
+  (let ((location (my:org-someday-location))
+        (markers (org-map-entries #'point-marker "TODO=\"SOMEDAY\"" 'file))
+        (count 0))
+    (dolist (m markers)
+      (save-excursion
+        (goto-char m)
+        (org-refile nil nil location)
+        (setq count (1+ count))))
+    (org-save-all-org-buffers)
+    (message "%d 件を someday.org に移しました" count)))
 
 ;; =======================================================================
 ;; アジェンダ（記事の (use-package org-agenda ...) にあたる部分）
