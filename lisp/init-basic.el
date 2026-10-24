@@ -18,18 +18,17 @@
 
 (global-set-key (kbd "C-c e e") #'my/reload-config)
 
-;; 物理的な Control + x で M-x（コマンド名を入力して実行）を開く
-;; macOS で Control と Command を入れ替えているため、物理的な Control は Super（s-）として届く。
-;; s-x は初期設定では「切り取り」に割り当てられているが、ここで上書きする。
-(global-set-key (kbd "s-x") #'execute-extended-command)
-
 ;; デバッグ用
 ;; (setq debug-on-error t)
 
-;; macOS の修飾キー（未決定）
-;; macOS 側で Control と Command を入れ替えている場合、
-;; 物理的な Control キーを Meta として使うには次の行を有効にする。
-;; (setq ns-command-modifier 'meta)
+;; macOS の修飾キー
+;; macOS の設定で Control と Command を入れ替えているため、
+;;   物理的な Control → Emacs には Command として届く → Meta にする
+;;   物理的な Command → Emacs には Control として届く → Control のまま
+;;   Option           → Meta（初期設定のまま）
+;; 物理的な Control + x で M-x、Control + Enter で M-RET になる。
+(when (eq system-type 'darwin)
+  (setq ns-command-modifier 'meta))
 
 ;; バックアップ、自動保存、ロックファイルを ~/.emacs.d/backups/ にまとめる
 (let ((dir (expand-file-name "backups/" user-emacs-directory)))

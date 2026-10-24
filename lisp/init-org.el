@@ -124,17 +124,7 @@ Otherwise, save to filename_image/."
 
   ;; キー割り当て
   (global-set-key (kbd "C-x C-y") #'org-insert-clipboard-image)
-  (define-key org-mode-map (kbd "C-c e l") #'my/org-export-to-pdf-with-lualatex)
-
-  ;; 見出しを作るキー（macOS で Control と Command を入れ替えているため）
-  ;; 物理的な Control キーは Emacs には Command（Super、s-）として届く。
-  ;; そこで、s- の組み合わせに見出しを作るコマンドを割り当てる。
-  ;;   物理 Control + Enter         → 見出しを作る
-  ;;   物理 Control + Shift + Enter → 状態付きの見出しを作る（最初の状態の INBOX が付く）
-  ;; 普通の行の先頭で押すと、その行が見出しになる。
-  ;; 行の末尾で押すと、カーソルの位置に新しい見出しを作る。
-  (define-key org-mode-map (kbd "s-<return>")   #'org-insert-heading)
-  (define-key org-mode-map (kbd "s-S-<return>") #'org-insert-todo-heading))
+  (define-key org-mode-map (kbd "C-c e l") #'my/org-export-to-pdf-with-lualatex))
 
 ;; =======================================================================
 ;; エクスポート
