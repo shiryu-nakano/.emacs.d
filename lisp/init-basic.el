@@ -18,6 +18,11 @@
 
 (global-set-key (kbd "C-c e e") #'my/reload-config)
 
+;; 物理的な Control + x で M-x（コマンド名を入力して実行）を開く
+;; macOS で Control と Command を入れ替えているため、物理的な Control は Super（s-）として届く。
+;; s-x は初期設定では「切り取り」に割り当てられているが、ここで上書きする。
+(global-set-key (kbd "s-x") #'execute-extended-command)
+
 ;; デバッグ用
 ;; (setq debug-on-error t)
 
