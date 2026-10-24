@@ -54,7 +54,7 @@
   ;; キャプチャのテンプレート（入れる先はその時点の年の inbox）
   (setq org-capture-templates
         '(("i" "Inbox" entry (file my/inbox-file)
-           "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
+           "* INBOX %?\n"
            :empty-lines 1)))
 
   ;; アジェンダの表示
