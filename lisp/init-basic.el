@@ -4,9 +4,19 @@
 (global-set-key (kbd "C-c e i")
                 (lambda () (interactive) (find-file user-init-file)))
 
-;; 開いているバッファを評価し直す
-;; lisp/ 内のファイルを変更したときは、そのファイルを開いて実行する
-(global-set-key (kbd "C-c e e") #'eval-buffer)
+;; 設定全体を読み込み直す
+;; lisp/ の中のファイルを init.el と同じ順に読み込み、最後に custom.el を読み込む。
+;; require は一度読み込んだファイルを読み込み直さないため、load を使う。
+(defun my/reload-config ()
+  "lisp/ の設定ファイルを init.el と同じ順に読み込み直す。"
+  (interactive)
+  (dolist (module my/init-modules)
+    (load (symbol-name module) nil 'nomessage))
+  (when (and custom-file (file-exists-p custom-file))
+    (load custom-file nil 'nomessage))
+  (message "設定を読み込み直しました"))
+
+(global-set-key (kbd "C-c e e") #'my/reload-config)
 
 ;; デバッグ用
 ;; (setq debug-on-error t)

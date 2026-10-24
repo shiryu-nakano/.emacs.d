@@ -10,8 +10,12 @@
 ;; C-c c は init-org.el で org-capture に割り当てているが、ここで上書きする。
 
 ;; GTD のファイルを置くフォルダ
-(defvar my/org-directory (expand-file-name "~/ghq/github.com/shiryu-nakano/Documents/org/")
+;; defvar は値がすでにあると設定し直さないため、値は setq で入れる
+;; （C-c e e で読み込み直したときにも変更が反映されるようにするため）
+(defvar my/org-directory nil
   "GTD のファイルを置くフォルダ。")
+(setq my/org-directory
+      (expand-file-name "~/ghq/github.com/shiryu-nakano/Documents/org/"))
 
 (defun my/inbox-file ()
   "その時点の年の inbox ファイル（例：inbox2026.org）のパスを返す。"
