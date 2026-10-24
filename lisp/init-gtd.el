@@ -5,7 +5,7 @@
 ;;   C-c C-s : （見出しの上で）予定日を付ける
 ;;   C-c a d : 今日のタスクを表示する
 ;;   C-c i   : その年の inbox を開く
-;;   C-c C-t : 状態を INBOX → TODO → DONE の順に切り替える
+;;   C-c C-t : 状態を切り替える（INBOX、TODO、DONE、SOMEDAY）
 ;; C-c a のキー割り当ては init-org.el にある。
 ;; C-c c は init-org.el で org-capture に割り当てているが、ここで上書きする。
 
@@ -40,12 +40,13 @@
   (setq org-agenda-files (list my/org-directory))
 
   ;; 状態
-  ;;   INBOX : 入れたばかりで、まだ何をするか決めていない
-  ;;   TODO  : やると決めた行動
-  ;;   DONE  : 完了
-  ;; WAIT と SOMEDAY は後の段階で加える
+  ;;   INBOX   : 入れたばかりで、まだ何をするか決めていない
+  ;;   TODO    : やると決めた行動
+  ;;   DONE    : 完了
+  ;;   SOMEDAY : いつかやるかもしれない（週次レビューで見直す）
+  ;; | より右は「終わった状態」として扱われ、未完了のタスクの一覧に出ない
   (setq org-todo-keywords
-        '((sequence "INBOX(i)" "TODO(t)" "|" "DONE(d)")))
+        '((sequence "INBOX(i)" "TODO(t)" "|" "DONE(d)" "SOMEDAY(s)")))
 
   ;; DONE にした日時を記録する（段階2の週次レビューで使う）
   (setq org-log-done 'time)
