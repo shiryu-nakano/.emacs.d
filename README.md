@@ -1,43 +1,48 @@
-# Emacs Org Workflow
+# .emacs.d
 
-This repo contains a personal Emacs config. The notes below document the
-Org-based daily log and knowledge/idea workflow implemented in `init.el`.
+個人用の Emacs 設定。Emacs 30 以降を前提にする（`use-package` の `:vc` 指定を使うため）。
 
-## Base directory
-- Org files live under `~/CABiNET/org2` on macOS (see `my/org-base-directory`
-  for OS-specific paths).
-- Daily logs are stored at `daily/YYYY/MM/YYYY-MM-DD.org`.
+## ファイル構成
 
-## Daily log lifecycle
-- Open or create today's log: `C-c n d` (`my/open-today-daily-log`).
-- New files are created from a template and copy several sections from
-  yesterday if they exist (Home, deadlines, tasks, task review, Agile,
-  reflection, and `* inbox`). See `init.el` for the exact section names.
-- `* inbox` (lowercase) is intended to carry over each day and be cleaned
-  via the DONE-archiving command below.
+| ファイル | 内容 |
+|---|---|
+| `early-init.el` | 画面を表示する前の設定（起動画面、ツールバー、透明化、タイトルバー） |
+| `init.el` | パッケージ管理、`custom.el` の指定、シェルの `PATH` の引き継ぎ、`lisp/` 内のファイルの読み込み |
+| `lisp/init-basic.el` | 設定ファイルを開くキー、バックアップの保存先 |
+| `lisp/init-ui.el` | 行番号、テーマ（manoj-dark） |
+| `lisp/init-evil.el` | Evil、`jj` でノーマルモードに戻る設定 |
+| `lisp/init-tools.el` | neotree、magit |
+| `lisp/init-org.el` | Org Mode の基本設定、画像の貼り付け、LuaLaTeX での PDF 出力、エクスポート（Markdown、Hugo、Jupyter Notebook） |
+| `lisp/init-python.el` | Python 開発環境（`.venv` の自動有効化、Pyright、company、flycheck、dap-mode） |
+| `lisp/init-claude.el` | vterm、claude-code-ide |
 
-## Capture shortcuts
-- `C-c c i`: add a new `** INBOX` entry under today's `* inbox`. This ensures
-  the daily file exists before inserting.
-- `C-c c j`: append a timestamped log entry under `* LOG`, with an optional
-  project tag chosen from top-level headings in `projects.org`.
-- `C-c c k`: add to `knowledge.org`.
-- `C-c c t`: add to `temp.org`.
-- `C-c c r`: add to `idea.org`.
+機能を外すときは、`init.el` の該当する `require` の行をコメントにする。
 
-## Agenda (daily-only view)
-- `C-c a` runs a wrapper that limits `org-agenda` to today's daily log file.
-- If the agenda is empty, confirm that today's log contains agenda-relevant
-  items (for example, entries with `SCHEDULED` or `DEADLINE`).
+`custom.el` は Customize が自動で書き込むファイルで、Git では管理しない。
 
-## Archiving DONE
-- `C-c n a` archives all DONE tasks in the current buffer to
-  `archives/task.org`.
+## 主なキー
 
-## Refile targets
-- Use `C-c r` to refile items into:
-  - `projects.org`
-  - `someday.org`
-  - `tips.org`
-  - `papers.org`
-  - `archive.org`
+| キー | 内容 |
+|---|---|
+| `C-c e i` | init.el を開く |
+| `C-c e e` | 開いているバッファを評価し直す |
+| `C-c t` | neotree の表示を切り替える |
+| `C-x g` | magit を開く |
+| `C-c a` / `C-c c` | Org のアジェンダ / キャプチャ |
+| `C-x C-y` | クリップボードの画像を Org に貼り付ける |
+| `C-c e l` | LuaLaTeX で PDF を出力する（Org の中のみ） |
+| `C-c l` | LSP のコマンド（Python） |
+| `C-c p` | クリップボードの画像を Claude Code に送る |
+
+## 新しい環境での準備
+
+Emacs の外で、次のコマンドを導入しておく。
+
+```zsh
+brew install pngpaste cmake   # 画像の貼り付け、vterm のビルド
+uv tool install pyright       # Python の言語サーバー
+```
+
+LuaLaTeX での PDF 出力には、LuaLaTeX と latexmk が必要（MacTeX などに含まれる）。
+
+初回の起動時に、パッケージのダウンロードと vterm のビルドがおこなわれる。

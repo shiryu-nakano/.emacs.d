@@ -1,7 +1,10 @@
-# Ignore everything except init.el
+# Ignore everything
 *
 
-# But keep init.el
-!init.el
+# Keep config files
 !.gitignore
 !README.md
+!early-init.el
+!init.el
+!lisp/
+!lisp/*.el

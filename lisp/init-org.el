@@ -1,0 +1,139 @@
+;;; init-org.el --- Org Mode とエクスポート  -*- lexical-binding: t; -*-
+
+;; 日付を英語で表記する（December など）
+(setq system-time-locale "C")
+
+;; Org 標準のアジェンダとキャプチャを呼び出すキー
+(global-set-key (kbd "C-c a") #'org-agenda)
+(global-set-key (kbd "C-c c") #'org-capture)
+
+;; =======================================================================
+;; クリップボードの画像を貼り付ける
+;; -----------------------------------------------------------------------
+;; macOS の pngpaste コマンドが必要（brew install pngpaste）。
+;; Hugo サイトの中（hugo.toml がある場所）では static/images/ に保存し、
+;; それ以外ではファイル名_image/ に保存する。
+;; =======================================================================
+
+(defun org-insert-clipboard-image ()
+  "Generate png file from a clipboard image and insert a link to current buffer.
+If inside a Hugo site (hugo.toml exists), save to static/images/ with relative path.
+Otherwise, save to filename_image/ (legacy behavior)."
+  (interactive)
+  (let* ((hugo-root (locate-dominating-file default-directory "hugo.toml")))
+    (if hugo-root
+        ;; Hugo サイトの中 → static/images/ に保存し、相対パスで参照する
+        (let* ((content-dir (expand-file-name "content" hugo-root))
+               (current-dir (file-name-directory (buffer-file-name)))
+               (relative-path (if (string-prefix-p content-dir current-dir)
+                                  (file-relative-name current-dir content-dir)
+                                ""))
+               (image-dir (expand-file-name
+                           (concat "static/images/" relative-path)
+                           hugo-root))
+               (image-name (format-time-string "%Y%m%d_%H%M%S.png"))
+               (image-file (concat image-dir image-name))
+               ;; org ファイルから static/images/... への相対パス
+               (org-link (file-relative-name image-file current-dir)))
+          (make-directory image-dir t)
+          (shell-command (concat "pngpaste " image-file))
+          (when (file-exists-p image-file)
+            (insert (format "#+ATTR_ORG: :width %d\n" 40))
+            (insert (concat "[[file:" org-link "]]")))
+          (org-display-inline-images))
+      ;; Hugo サイトの外 → ファイル名_image/ に保存する
+      (let* ((filename
+              (concat (file-name-nondirectory (buffer-file-name))
+                      "_image/"
+                      (format-time-string "%Y%m%d_%H%M%S")
+                      ".png")))
+        (unless (file-exists-p (file-name-directory filename))
+          (make-directory (file-name-directory filename)))
+        (shell-command (concat "pngpaste " filename))
+        (when (file-exists-p filename)
+          (insert (format "#+ATTR_ORG: :width %d\n" 40))
+          (insert (concat "[[file:" filename "]]")))
+        (org-display-inline-images)))))
+
+;; =======================================================================
+;; LuaLaTeX で PDF を出力する
+;; -----------------------------------------------------------------------
+;; LuaLaTeX と latexmk が必要（MacTeX などに含まれる）。
+;; LaTeX プレビューの設定には影響しない。
+;; =======================================================================
+
+(defun my/org-export-to-pdf-with-lualatex ()
+  "Export current org buffer to PDF using LuaLaTeX."
+  (interactive)
+  ;; 下の let で ox-latex の変数を一時的に変えるため、先に読み込んでおく
+  (require 'ox-latex)
+  (let ((org-latex-compiler "lualatex")
+        (org-latex-pdf-process
+         '("latexmk -f -pdf -lualatex -interaction=nonstopmode -output-directory=%o %f"))
+        (org-latex-packages-alist
+         (append '(("" "luatexja" t)
+                   ("" "listings" t)
+                   ("" "xcolor" t))
+                 org-latex-packages-alist))
+        ;; listings で枠付きのコードブロックにする
+        (org-latex-listings t)
+        (org-latex-listings-options
+         '(("frame" "single")
+           ("basicstyle" "\\ttfamily\\small")
+           ("breaklines" "true")))
+        ;; LuaLaTeX では inputenc と fontenc は不要
+        (org-latex-default-packages-alist
+         (seq-remove (lambda (p) (member (cadr p) '("inputenc" "fontenc")))
+                     org-latex-default-packages-alist)))
+    (org-latex-export-to-pdf)))
+
+;; =======================================================================
+;; Org Mode 本体
+;; =======================================================================
+
+(use-package org
+  :ensure nil                           ; Emacs 標準
+  :defer t
+  :config
+  ;; 画像の表示幅を #+ATTR_ORG で指定できるようにする
+  (setq org-image-actual-width nil)
+
+  ;; Emacs 29 以降の Retina 環境で、LaTeX プレビューが2倍の大きさになる問題の修正
+  ;; インライン画像の自動拡大を無効にする
+  (setq image-scaling-factor 1.0)
+  (setq org-format-latex-options
+        (plist-put org-format-latex-options :scale 0.9))
+
+  ;; コードブロックで Python を実行できるようにする
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((python . t)))
+  ;; 実行前の確認を省く
+  (setq org-confirm-babel-evaluate nil)
+
+  ;; キー割り当て
+  (global-set-key (kbd "C-x C-y") #'org-insert-clipboard-image)
+  (define-key org-mode-map (kbd "C-c e l") #'my/org-export-to-pdf-with-lualatex))
+
+;; =======================================================================
+;; エクスポート
+;; -----------------------------------------------------------------------
+;; エクスポートの画面（C-c C-e）を初めて開いたときに読み込まれる。
+;; =======================================================================
+
+;; Markdown
+(with-eval-after-load 'ox
+  (require 'ox-md))
+
+;; Hugo
+(use-package ox-hugo
+  :ensure t
+  :after ox)
+
+;; Jupyter Notebook（MELPA にないため GitHub から取得する）
+(use-package ox-ipynb
+  :vc (:url "https://github.com/jkitchin/ox-ipynb" :rev :newest)
+  :after ox)
+
+(provide 'init-org)
+;;; init-org.el ends here
