@@ -12,6 +12,8 @@
 ;;   - C-c h（helm-org-in-buffer-headings）は割り当てない。helm を入れていないため
 ;;   - defadvice は古い書き方のため、advice-add で書き直した
 ;;   - キャプチャはテンプレートを選ばず、C-c c だけで inbox に入れる。作成日時は記録しない
+;;   - inbox のファイルには「inbox」見出しを作らず、最上位の見出しとして入れる
+;;   - 見出しを移す先から inbox のファイルを外した
 ;;   - SOMEDAY の見出しを someday.org にまとめて移すコマンドを加えた
 ;;
 ;; 主な操作
@@ -78,13 +80,17 @@
   ;; タグ（C-c C-q で付ける。括弧の中の文字で選べる）
   (setq org-tag-alist '(("PROJECT" . ?p) ("MEMO" . ?m) ("PETIT" . ?t)))
 
-  ;; キャプチャのテンプレート（inbox ファイルの「inbox」見出しの下に INBOX として入れる）
+  ;; キャプチャのテンプレート（inbox ファイルの末尾に、最上位の見出しとして INBOX で入れる）
   (setq org-capture-templates
-        '(("t" "Task" entry (file+headline org-default-notes-file "inbox")
-           "** INBOX %?\n")))
+        '(("t" "Task" entry (file org-default-notes-file)
+           "* INBOX %?\n")))
 
-  ;; 見出しを移す先は、アジェンダが読むファイルの最上位の見出し
-  (setq org-refile-targets '((org-agenda-files :maxlevel . 1)))
+  ;; 見出しを移す先は、アジェンダが読むファイルの最上位の見出し。
+  ;; ただし inbox のファイルは除く（inbox の用件一つ一つが移す先の候補に並ばないようにするため）
+  (defun my:org-refile-files ()
+    (seq-remove (lambda (f) (file-equal-p f org-default-notes-file))
+                (org-agenda-files)))
+  (setq org-refile-targets '((my:org-refile-files :maxlevel . 1)))
 
   ;; 時間の計測（org-clock）
   (setq org-log-done 'time)                         ; 完了した日時を記録する
