@@ -88,6 +88,13 @@
 
   ;; 時間の計測（org-clock）
   (setq org-log-done 'time)                         ; 完了した日時を記録する
+
+  ;; SOMEDAY は | より右（終わった状態）にあるため、そのままだと CLOSED の日時が付く。
+  ;; SOMEDAY は完了ではないので、SOMEDAY にしたときは CLOSED を消す。
+  (defun my:org-remove-closed-for-someday ()
+    (when (equal org-state "SOMEDAY")
+      (org-add-planning-info nil nil 'closed)))
+  (add-hook 'org-after-todo-state-change-hook #'my:org-remove-closed-for-someday)
   (setq org-clock-clocked-in-display 'frame-title)  ; 計測中のタスク名をウィンドウの題名に表示する
 
   :bind
