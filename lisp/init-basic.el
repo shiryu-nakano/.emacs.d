@@ -21,15 +21,10 @@
 ;; デバッグ用
 ;; (setq debug-on-error t)
 
-;; macOS の修飾キー
-;; macOS の設定で Control と Command を入れ替えているため、
-;; Emacs の中だけ元に戻し、物理的なキーどおりに動くようにする。
-;;   物理的な Control → macOS からは Command として届く → Emacs では Control
-;;   物理的な Command → macOS からは Control として届く → Emacs では Super
-;;   Option           → Emacs では Meta（初期設定のまま）
-(when (eq system-type 'darwin)
-  (setq ns-command-modifier 'control
-        ns-control-modifier 'super))
+;; macOS の修飾キー（未決定）
+;; macOS 側で Control と Command を入れ替えている場合、
+;; 物理的な Control キーを Meta として使うには次の行を有効にする。
+;; (setq ns-command-modifier 'meta)
 
 ;; バックアップ、自動保存、ロックファイルを ~/.emacs.d/backups/ にまとめる
 (let ((dir (expand-file-name "backups/" user-emacs-directory)))
