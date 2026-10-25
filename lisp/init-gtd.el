@@ -20,6 +20,11 @@
 ;;   C-c c   : inbox に入れる（INBOX の状態で入る）
 ;;   C-c i   : inbox のファイルを開く
 ;;   M-x my:org-move-someday : 開いているファイルの SOMEDAY を someday.org に移す
+;;   C-c r   : カーソルのある見出しを Reference（cabinet/reference.org）に移す
+;;   C-c a i : inbox（INBOX の一覧）
+;;   C-c a n : Next Actions（予定日も締め切りもない TODO の一覧）
+;;   C-c a w : Waiting For（WAIT の一覧）
+;;   INBOX の見出しに予定日（C-c C-s）か締め切り（C-c C-d）を付けると、TODO に変わる
 ;;   C-c a d : 今日のタスク
 ;;   C-c a x : 予定日も締め切りもないタスクの一覧
 ;;   C-c g   : 時間を計測中のタスクへ移動する
@@ -108,6 +113,7 @@
    ("C-c c" . my:org-capture-inbox)
    ("C-c g" . org-clock-goto)
    ("C-c i" . my:org-goto-inbox)
+   ("C-c r" . my:org-move-to-reference)
    :map org-mode-map
    ("M-n" . org-forward-heading-same-level)
    ("M-p" . org-backward-heading-same-level)))
@@ -132,6 +138,49 @@
            (save-buffer)
            (setq pos (org-find-exact-headline-in-buffer "someday")))
          (list "someday" file nil (marker-position pos)))))))
+
+;; =======================================================================
+;; 予定日か締め切りを付けたら、INBOX を TODO に変える
+;; -----------------------------------------------------------------------
+;; C-c C-s（予定日）と C-c C-d（締め切り）の後に実行される。
+;; アジェンダの画面で予定日を付けたときも同じように動く。
+;; 日付を外したとき（C-u を付けて実行したとき）は何もしない。
+;; =======================================================================
+
+(defun my:org-inbox-to-todo-after-date (arg &rest _)
+  "日付を付けた見出しが INBOX なら TODO に変える。"
+  (unless (equal arg '(4))
+    (save-excursion
+      (org-back-to-heading t)
+      (when (equal (org-get-todo-state) "INBOX")
+        (org-todo "TODO")))))
+
+(advice-add 'org-schedule :after #'my:org-inbox-to-todo-after-date)
+(advice-add 'org-deadline :after #'my:org-inbox-to-todo-after-date)
+
+;; =======================================================================
+;; 見出しを Reference に移す（仮の置き場所：org-directory/cabinet/reference.org）
+;; -----------------------------------------------------------------------
+;; 行動は不要だが、後で見返したい情報を置く場所。
+;; 移すときに INBOX などの状態は外す。
+;; cabinet/ はアジェンダが読む範囲に入っていないので、タスクの一覧には出ない。
+;; =======================================================================
+
+(defun my:org-move-to-reference ()
+  "カーソルのある見出しを、状態を外して cabinet/reference.org の末尾に移す。"
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Org のファイルの中で実行してください"))
+  (let ((file (expand-file-name "cabinet/reference.org" org-directory)))
+    (make-directory (file-name-directory file) t)
+    (unless (file-exists-p file)
+      (with-temp-file file (insert "#+title: Reference\n\n")))
+    (org-back-to-heading t)
+    (when (org-get-todo-state)
+      (org-todo 'none))
+    (org-refile nil nil (list nil file nil nil))
+    (org-save-all-org-buffers)
+    (message "Reference に移しました")))
 
 (defun my:org-move-someday ()
   "開いているファイルの SOMEDAY の見出しを、someday.org にまとめて移す。"
@@ -166,7 +215,15 @@
         '(("x" "Unscheduled Tasks" tags-todo
            "-SCHEDULED>=\"<today>\"-DEADLINE>=\"<today>\"" nil)
           ("d" "Daily Tasks" agenda ""
-           ((org-agenda-span 1)))))
+           ((org-agenda-span 1)))
+          ;; inbox：まだ処理していないもの
+          ("i" "Inbox" todo "INBOX")
+          ;; Next Actions：やると決めたが、日付を決めていないもの
+          ("n" "Next Actions" todo "TODO"
+           ((org-agenda-todo-ignore-scheduled 'all)
+            (org-agenda-todo-ignore-deadlines 'all)))
+          ;; Waiting For：他人の返事などを待っているもの
+          ("w" "Waiting For" todo "WAIT")))
   ;; 完了したタスクを、予定日の欄に表示しない
   (setq org-agenda-skip-scheduled-if-done t)
   ;; リンクの上で Enter を押すとリンク先を開く
