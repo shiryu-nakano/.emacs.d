@@ -15,16 +15,21 @@
 ;;   - inbox のファイルには「inbox」見出しを作らず、最上位の見出しとして入れる
 ;;   - 見出しを移す先から inbox のファイルを外した
 ;;   - SOMEDAY の見出しを someday.org にまとめて移すコマンドを加えた
+;;   - DONE と CANCEL の見出しを cabinet/archive.org にまとめて移すコマンドを加えた
 ;;
 ;; 主な操作
 ;;   C-c c   : inbox に入れる（INBOX の状態で入る）
 ;;   C-c i   : inbox のファイルを開く
-;;   M-x my:org-move-someday : 開いているファイルの SOMEDAY を someday.org に移す
+;;   C-c n s : 開いているファイルの SOMEDAY を someday.org に移す
+;;   C-c n a : 開いているファイルで DONE か CANCEL の最上位の見出しを、下の階層ごと cabinet/archive.org に移す
 ;;   C-c r   : カーソルのある見出しを Reference（cabinet/reference.org）に移す
 ;;   C-c a i : inbox（INBOX の一覧）
 ;;   C-c a n : Next Actions（予定日も締め切りもない TODO の一覧）
 ;;   C-c a w : Waiting For（WAIT の一覧）
 ;;   INBOX の見出しに予定日（C-c C-s）か締め切り（C-c C-d）を付けると、TODO に変わる
+;;   inbox の見出しを DONE にすると、その日のブログの日報にコピーされる（inbox には残る）
+;;   C-c n l : inbox にある DONE の見出しを、それぞれ DONE にした日の日報にまとめてコピーする
+;;   C-c a a : 今日から2週間の予定
 ;;   C-c a d : 今日のタスク
 ;;   C-c a x : 予定日も締め切りもないタスクの一覧
 ;;   C-c g   : 時間を計測中のタスクへ移動する
@@ -198,6 +203,175 @@
     (org-save-all-org-buffers)
     (message "%d 件を someday.org に移しました" count)))
 
+(global-set-key (kbd "C-c n s") #'my:org-move-someday)
+
+;; =======================================================================
+;; DONE と CANCEL の見出しを cabinet/archive.org にまとめて移す
+;; -----------------------------------------------------------------------
+;; 移すのは、最上位の見出し（* の見出し）が DONE か CANCEL のものだけ。
+;; 下の階層の見出しは、DONE であっても単独では移さない。
+;; 最上位の見出しを移すときに、その下の見出しもまとめて移る。
+;;
+;; Org 標準のアーカイブ（org-archive-subtree）を使う。
+;; 移した見出しには、移した日時や元のファイルが ARCHIVE_TIME、ARCHIVE_FILE などのプロパティとして残る。
+;; cabinet/ はアジェンダが読む範囲に入っていないので、移した見出しはタスクの一覧に出ない。
+;;
+;; 画像などの file: リンクが相対パスで書かれていると、移した先のフォルダからはファイルが見つからない。
+;; そのため、移す前にリンクのパスを archive.org の場所からの相対パスに書き換える。
+;; 例：inbox の [[file:images/a.png]] は、archive.org では [[file:../images/a.png]] になる。
+;; 画像のファイルそのものは移さない。
+;; =======================================================================
+
+(defun my:org-rewrite-file-links (beg end from-dir to-dir)
+  "BEG から END までの相対パスの file: リンクを書き換える。
+FROM-DIR からの相対パスを、同じファイルを指す TO-DIR からの相対パスにする。
+絶対パス（~/ で始まるものを含む）のリンクは変えない。"
+  (save-excursion
+    (let ((end (copy-marker end)))
+      (goto-char beg)
+      (while (re-search-forward "\\[\\[file:\\([^]]+\\)\\]" end t)
+        (let* ((target (match-string 1))
+               ;; file:a.org::*見出し のような検索の指定は、パスと分けて残す
+               (sep    (string-search "::" target))
+               (path   (if sep (substring target 0 sep) target))
+               (search (if sep (substring target sep) "")))
+          (unless (file-name-absolute-p path)
+            (replace-match (concat (file-relative-name (expand-file-name path from-dir)
+                                                       to-dir)
+                                   search)
+                           t t nil 1))))
+      (set-marker end nil))))
+
+(defun my:org-archive-done ()
+  "開いているファイルで DONE か CANCEL の最上位の見出しを、cabinet/archive.org にまとめて移す。
+下の階層の見出しも一緒に移る。"
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Org のファイルの中で実行してください"))
+  (let* ((file     (expand-file-name "cabinet/archive.org" org-directory))
+         (from-dir (file-name-directory (buffer-file-name)))
+         (to-dir   (file-name-directory file))
+         ;; 「ファイル名::」の形で指定すると、移す先のファイルの最上位の見出しとして入る
+         (org-archive-location (concat file "::"))
+         ;; 後ろの見出しから順に移す
+         (markers (nreverse (org-map-entries #'point-marker
+                                             "LEVEL=1+TODO=\"DONE\"|LEVEL=1+TODO=\"CANCEL\""
+                                             'file)))
+         (count 0))
+    (make-directory to-dir t)
+    (unless (file-exists-p file)
+      (with-temp-file file (insert "#+title: Archive\n\n")))
+    (dolist (m markers)
+      (goto-char m)
+      (org-back-to-heading t)
+      ;; 見出しとその下の階層にある file: リンクのパスを書き換えてから移す
+      (my:org-rewrite-file-links (point)
+                                 (save-excursion (org-end-of-subtree t t))
+                                 from-dir to-dir)
+      (org-archive-subtree)
+      (set-marker m nil)
+      (setq count (1+ count)))
+    (org-save-all-org-buffers)
+    (message "%d 件を cabinet/archive.org に移しました" count)))
+
+(global-set-key (kbd "C-c n a") #'my:org-archive-done)
+
+;; =======================================================================
+;; inbox のタスクを DONE にしたら、その日の日報にコピーする
+;; -----------------------------------------------------------------------
+;; inbox のファイルで見出しを DONE にすると、その見出しと下の階層を、
+;; ブログの日報（init-blog.el の my/blog-daily-file）の末尾に最上位の見出しとしてコピーする。
+;; inbox の見出しはそのまま残す。
+;; アジェンダの画面で DONE にしたときも同じように動く。
+;; 日報がなければ、ヘッダーだけのファイルを作ってからコピーする。
+;; 日報に同じ見出しがすでにあればコピーしない（DONE を付け直したときに二重にならないようにするため）。
+;;
+;; 日付は DONE にした日（org-extend-today-until を設定していれば、それも反映される）。
+;; 画像などの file: リンクは、日報の場所からの相対パスに書き換える。
+;; 画像のファイルそのものはコピーしないため、ブログ上では画像が表示されない。
+;; 日報はブログ（公開リポジトリ）なので、コピーした内容は push すると公開される。
+;; =======================================================================
+
+(defun my:org-inbox-buffer-p ()
+  "開いているバッファが inbox のファイルなら t を返す。"
+  (and (buffer-file-name)
+       (file-equal-p (buffer-file-name) org-default-notes-file)))
+
+(defun my:org-copy-done-to-daily ()
+  "inbox の見出しが DONE になったら、その日の日報の末尾にコピーする。"
+  (when (and (equal org-state "DONE")
+             (my:org-inbox-buffer-p))
+    (message "%s" (cdr (my:org-copy-subtree-to-daily (org-current-effective-time))))))
+
+(defun my:org-copy-subtree-to-daily (time)
+  "カーソルのある見出しと下の階層を、TIME の日の日報の末尾にコピーする。
+日報に同じ DONE の見出しがすでにあればコピーしない。
+コピーしたら (t . メッセージ)、しなかったら (nil . メッセージ) を返す。"
+  (let* ((file     (my/blog-daily-file time))
+         (from-dir (file-name-directory (buffer-file-name)))
+         (to-dir   (file-name-directory file))
+         ;; 見出しの文字（DONE の後ろ）。日報に同じ見出しがあるかを調べるのに使う
+         (title    (save-excursion
+                     (org-back-to-heading t)
+                     (org-get-heading t t t t)))
+         (tree     (save-excursion
+                     (org-back-to-heading t)
+                     (buffer-substring-no-properties
+                      (point) (org-end-of-subtree t t)))))
+    ;; file: リンクのパスを、日報の場所からの相対パスに書き換える
+    (setq tree (with-temp-buffer
+                 (insert tree)
+                 (my:org-rewrite-file-links (point-min) (point-max) from-dir to-dir)
+                 (buffer-string)))
+    (unless (file-exists-p file)
+      (make-directory to-dir t)
+      (with-temp-file file (insert (my/blog-daily-header time))))
+    (with-current-buffer (find-file-noselect file)
+      (org-with-wide-buffer
+       (goto-char (point-min))
+       (if (re-search-forward
+            (format "^\\*+ +DONE +%s[ \t]*\\(?::.*:\\)?[ \t]*$" (regexp-quote title))
+            nil t)
+           (cons nil (format "日報にすでにあるのでコピーしませんでした：%s" title))
+         (goto-char (point-max))
+         (unless (bolp) (insert "\n"))
+         ;; 1 を渡すと、最上位の見出しとして貼り付ける
+         (org-paste-subtree 1 tree)
+         (save-buffer)
+         (cons t (format "日報にコピーしました：%s" title)))))))
+
+(add-hook 'org-after-todo-state-change-hook #'my:org-copy-done-to-daily)
+
+;; -----------------------------------------------------------------------
+;; inbox にある DONE の見出しを、DONE にした日（CLOSED の日付）の日報にまとめてコピーする
+;; -----------------------------------------------------------------------
+;; 自動のコピーを入れる前に DONE にしたものを、後からコピーするのに使う。
+;; inbox のファイルを開いていなくても、inbox のファイルを対象にする。
+;; 下の階層の DONE も対象にする。ただし、親と同じ日に DONE にしたものは
+;; 親と一緒にコピー済みなので、二重にはならない。
+;; CLOSED の日付がない DONE は飛ばす。
+
+(defun my:org-copy-all-done-to-daily ()
+  "inbox にある DONE の見出しを、それぞれ CLOSED の日付の日報にコピーする。"
+  (interactive)
+  (let ((copied 0) (skipped 0) (no-date 0))
+    (with-current-buffer (find-file-noselect org-default-notes-file)
+      (org-with-wide-buffer
+       ;; 前の見出しから順に処理する（親を子より先にコピーするため）
+       (dolist (m (org-map-entries #'point-marker "TODO=\"DONE\"" 'file))
+         (goto-char m)
+         (let ((closed (org-entry-get nil "CLOSED")))
+           (if (not closed)
+               (setq no-date (1+ no-date))
+             (if (car (my:org-copy-subtree-to-daily (org-time-string-to-time closed)))
+                 (setq copied (1+ copied))
+               (setq skipped (1+ skipped)))))
+         (set-marker m nil))))
+    (message "日報に %d 件コピーしました（すでにあった：%d 件、CLOSED の日付がない：%d 件）"
+             copied skipped no-date)))
+
+(global-set-key (kbd "C-c n l") #'my:org-copy-all-done-to-daily)
+
 ;; =======================================================================
 ;; アジェンダ（記事の (use-package org-agenda ...) にあたる部分）
 ;; =======================================================================
@@ -224,6 +398,10 @@
             (org-agenda-todo-ignore-deadlines 'all)))
           ;; Waiting For：他人の返事などを待っているもの
           ("w" "Waiting For" todo "WAIT")))
+  ;; C-c a a で表示する日数（Org の初期値は一週間）。
+  ;; C-c a d は、上の設定で一日に指定しているので、この値の影響を受けない。
+  ;; 日数を7以外にすると、今週の月曜日からではなく、今日から表示する。
+  (setq org-agenda-span 14)
   ;; 完了したタスクを、予定日の欄に表示しない
   (setq org-agenda-skip-scheduled-if-done t)
   ;; リンクの上で Enter を押すとリンク先を開く

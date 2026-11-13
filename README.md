@@ -13,6 +13,7 @@
 | `lisp/init-evil.el` | Evil、`jj` でノーマルモードに戻る設定 |
 | `lisp/init-tools.el` | neotree、magit |
 | `lisp/init-org.el` | Org Mode の基本設定、画像の貼り付け、LuaLaTeX での PDF 出力、エクスポート（Markdown、Hugo、Jupyter Notebook） |
+| `lisp/init-blog.el` | ブログの日報と weekly のページを開く、なければ作る |
 | `lisp/init-python.el` | Python 開発環境（`.venv` の自動有効化、Pyright、company、flycheck、dap-mode） |
 | `lisp/init-claude.el` | vterm、claude-code-ide |
 
@@ -31,6 +32,10 @@
 | `C-c a` / `C-c c` | Org のアジェンダ / キャプチャ |
 | `C-x C-y` | クリップボードの画像を Org に貼り付ける |
 | `C-c e l` | LuaLaTeX で PDF を出力する（Org の中のみ） |
+| `C-c n h` | 今日の日報を開く（なければ作る） |
+| `C-c n w` | 今週の weekly を開く（なければ作る） |
+| `C-c n s` | 開いているファイルの SOMEDAY を someday.org に移す |
+| `C-c n a` | 開いているファイルで DONE か CANCEL の最上位の見出しを、下の階層ごと cabinet/archive.org に移す |
 | `C-c l` | LSP のコマンド（Python） |
 | `C-c p` | クリップボードの画像を Claude Code に送る |
 

@@ -47,19 +47,26 @@
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 
 ;; 読み込む順番もこの並びで決まる。C-c e e で読み込み直すときも同じ順になる。
-(defvar my/init-modules
+;; defvar は二回目以降に値を変えないため、defconst にして、読み込み直すたびにこの一覧を使う。
+(defconst my/init-modules
   '(init-basic    ; 基本操作、バックアップの保存先
     init-ui       ; 行番号、テーマ
     init-evil     ; Evil
     init-tools    ; neotree、magit
     init-org      ; Org Mode、エクスポート
+    init-blog     ; ブログの日報と weekly
     init-gtd      ; GTD（段階1）
+    init-research ; 実験レポート（ResearchLog）
     init-python   ; Python 開発環境
     init-claude)  ; vterm、Claude Code
   "init.el から読み込む設定ファイルの一覧。")
 
+;; 初めて読むファイルは require で、すでに読んだファイルは load で読み込み直す。
+;; require は一度読んだファイルを読み直さないため。
 (dolist (module my/init-modules)
-  (require module))
+  (if (featurep module)
+      (load (symbol-name module) nil 'nomessage)
+    (require module)))
 
 ;; Customize が書き込んだ設定を最後に読み込む
 (load custom-file 'noerror)

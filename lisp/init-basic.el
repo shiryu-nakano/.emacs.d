@@ -5,16 +5,18 @@
                 (lambda () (interactive) (find-file user-init-file)))
 
 ;; 設定全体を読み込み直す
-;; lisp/ の中のファイルを init.el と同じ順に読み込み、最後に custom.el を読み込む。
-;; require は一度読み込んだファイルを読み込み直さないため、load を使う。
+;; init.el をそのまま読み込み直す。init.el の中で、すでに読んだ lisp/ のファイルは load で読み直し、
+;; 新しく一覧に加えたファイルは require で読み込む。custom.el も init.el の最後で読み込まれる。
+;; 読み込み直したファイルの数と、かかった時間を表示する。
 (defun my/reload-config ()
-  "lisp/ の設定ファイルを init.el と同じ順に読み込み直す。"
+  "init.el を読み込み直し、lisp/ の設定ファイルをすべて読み込み直す。"
   (interactive)
-  (dolist (module my/init-modules)
-    (load (symbol-name module) nil 'nomessage))
-  (when (and custom-file (file-exists-p custom-file))
-    (load custom-file nil 'nomessage))
-  (message "設定を読み込み直しました"))
+  (let ((start (current-time)))
+    (load user-init-file nil 'nomessage)
+    (message "設定を読み込み直しました（%d 個のファイル、%.2f 秒）: %s"
+             (length my/init-modules)
+             (float-time (time-subtract (current-time) start))
+             (mapconcat #'symbol-name my/init-modules " "))))
 
 (global-set-key (kbd "C-c e e") #'my/reload-config)
 
