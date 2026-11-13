@@ -8,7 +8,8 @@
 ;;   weekly : content/posts/daily/<年>/<月>/week-<週番号>.org           例：2026/11/week-45.org
 ;;
 ;; 主な操作
-;;   C-c n h : 今日の日報を開く。なければヘッダーだけのファイルを作る
+;;   C-c n h : 今日の日報を開く。なければヘッダーの後にテンプレート（Templates/daily.org）の中身を入れて作る
+;;   C-c n t : 日報のテンプレートを開く
 ;;   C-c n w : 今週の weekly を開く。なければヘッダーと、月曜から日曜までの日付の一覧を入れたファイルを作る
 ;;
 ;; 週番号は ISO 8601 の決め方（月曜始まり）に従う。
@@ -57,13 +58,38 @@
     (my/blog--header (format-time-string "%Y-%m-%d %a" time)
                      (format-time-string "/posts/daily/%Y/%m/%d/" time))))
 
+(defconst my/blog-daily-template
+  (expand-file-name "../../../Templates/daily.org" my/blog-daily-dir)
+  "日報の本文のテンプレート。ヘッダー（#+TITLE など）は書かず、見出しなどの本文だけを書く。
+リポジトリ直下の Templates/ にあり、content/ の外なのでブログには公開されない。")
+
+(defun my/blog--daily-template-body ()
+  "テンプレートの中身を返す。テンプレートがなければ空の文字列を返す。"
+  (if (file-exists-p my/blog-daily-template)
+      (with-temp-buffer
+        (insert-file-contents my/blog-daily-template)
+        (buffer-string))
+    ""))
+
+(defun my/blog-daily-new-content (time)
+  "TIME の日の日報を新しく作るときの中身（ヘッダーとテンプレートの中身）を返す。
+`C-c n h' で作るときも、inbox の DONE をコピーするとき（init-gtd.el）も、これを使う。"
+  (concat (my/blog-daily-header time)
+          (my/blog--daily-template-body)))
+
 (defun my/blog-open-today-daily ()
-  "今日の日報を開く。なければヘッダーだけのファイルを作る。"
+  "今日の日報を開く。
+なければ、今日の日付のヘッダーにテンプレート（`my/blog-daily-template'）の中身を続けたファイルを作る。"
   (interactive)
   (let* ((now  (current-time))
          (file (my/blog-daily-file now)))
-    (when (my/blog--open-or-create file (my/blog-daily-header now))
+    (when (my/blog--open-or-create file (my/blog-daily-new-content now))
       (message "今日の日報を作りました：%s" file))))
+
+(defun my/blog-open-daily-template ()
+  "日報のテンプレートを開く。"
+  (interactive)
+  (find-file my/blog-daily-template))
 
 (defun my/blog--monday (time)
   "TIME を含む週（月曜始まり）の月曜日の時刻を返す。"
@@ -98,6 +124,7 @@
 
 (global-set-key (kbd "C-c n h") #'my/blog-open-today-daily)
 (global-set-key (kbd "C-c n w") #'my/blog-open-this-week)
+(global-set-key (kbd "C-c n t") #'my/blog-open-daily-template)
 
 (provide 'init-blog)
 ;;; init-blog.el ends here

@@ -283,7 +283,7 @@ FROM-DIR からの相対パスを、同じファイルを指す TO-DIR からの
 ;; ブログの日報（init-blog.el の my/blog-daily-file）の末尾に最上位の見出しとしてコピーする。
 ;; inbox の見出しはそのまま残す。
 ;; アジェンダの画面で DONE にしたときも同じように動く。
-;; 日報がなければ、ヘッダーだけのファイルを作ってからコピーする。
+;; 日報がなければ、ヘッダーとテンプレート（init-blog.el の my/blog-daily-new-content）で作ってからコピーする。
 ;; 日報に同じ見出しがすでにあればコピーしない（DONE を付け直したときに二重にならないようにするため）。
 ;;
 ;; 日付は DONE にした日（org-extend-today-until を設定していれば、それも反映される）。
@@ -325,7 +325,7 @@ FROM-DIR からの相対パスを、同じファイルを指す TO-DIR からの
                  (buffer-string)))
     (unless (file-exists-p file)
       (make-directory to-dir t)
-      (with-temp-file file (insert (my/blog-daily-header time))))
+      (with-temp-file file (insert (my/blog-daily-new-content time))))
     (with-current-buffer (find-file-noselect file)
       (org-with-wide-buffer
        (goto-char (point-min))
